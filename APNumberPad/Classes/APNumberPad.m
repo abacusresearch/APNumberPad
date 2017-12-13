@@ -127,13 +127,18 @@
     CGFloat left = (CGRectGetWidth(self.bounds) - maximumWidth) / 2;
     CGFloat top = 0.f;
 
+  CGRect bounds = self.bounds;
+  CGFloat boundsHeight = CGRectGetHeight(bounds);
+  if (@available(iOS 11.0, *)) {
+    boundsHeight -= self.window.safeAreaInsets.bottom;
+  }
 #if defined(__LP64__) && __LP64__
-    CGFloat buttonHeight = trunc((CGRectGetHeight(self.bounds) - sep * (rows - 1)) / rows) + sep;
+    CGFloat buttonHeight = trunc((boundsHeight - sep * (rows - 1)) / rows) + sep;
 #else
-    CGFloat buttonHeight = truncf((CGRectGetHeight(self.bounds) - sep * (rows - 1)) / rows) + sep;
+    CGFloat buttonHeight = truncf((boundsHeight - sep * (rows - 1)) / rows) + sep;
 #endif
 
-    CGSize buttonSize = CGSizeMake((CGRectGetWidth(self.bounds) - sep * (sections - 1)) / sections, buttonHeight);
+    CGSize buttonSize = CGSizeMake((CGRectGetWidth(bounds) - sep * (sections - 1)) / sections, buttonHeight);
     if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
         buttonSize = CGSizeMake((maximumWidth - sep * (sections - 1)) / sections, buttonHeight);
     }
@@ -145,7 +150,7 @@
         numberButton.frame = CGRectMake(left, top, buttonSize.width, buttonSize.height);
 
         if (i % sections == 0) {
-            left = (CGRectGetWidth(self.bounds) - maximumWidth) / 2;
+            left = (CGRectGetWidth(bounds) - maximumWidth) / 2;
             top += buttonSize.height + sep;
         }
         else {
@@ -155,7 +160,7 @@
 
     // Function button
     //
-    left = (CGRectGetWidth(self.bounds) - maximumWidth) / 2;
+    left = (CGRectGetWidth(bounds) - maximumWidth) / 2;
     self.leftButton.frame = CGRectMake(left, top, buttonSize.width, buttonSize.height);
 
     // Number buttons (0)
