@@ -5,8 +5,7 @@
 //  Copyright (c) 2014 Podkovyrin. All rights reserved.
 //
 
-#import "APNumberButton.h"
-#import "APNumberPadDefaultStyle.h"
+#import "Private/APNumberButton.h"
 
 #import "APNumberPad.h"
 
@@ -19,6 +18,11 @@
         unsigned int delegateSupportsTextViewShouldChangeTextInRange : 1;
     } _delegateFlags;
 }
+
+/**
+ * Plain UIView used to block out the safe area
+ */
+@property (strong, readwrite, nonatomic) UIView *safeAreaCover;
 
 /**
  *  Array of APNumberButton
@@ -38,7 +42,7 @@
 /**
  *  Auto-detected text input
  */
-@property (weak, readwrite, nonatomic) UIResponder<UITextInput> *textInput;
+@property (weak, readwrite, nonatomic) UIResponder<UIKeyInput> *textInput;
 
 /**
  *  Last touch on view. For support tap by tap entering text
@@ -85,6 +89,10 @@
         }
         self.numberButtons = numberButtons;
 
+        self.safeAreaCover = [[UIView alloc] initWithFrame:CGRectZero];
+        self.safeAreaCover.backgroundColor = [self.styleClass safeAreaSpaceColor];
+        [self addSubview:self.safeAreaCover];
+
         // Function button
         //
         self.leftButton = [self functionButton];
@@ -117,28 +125,29 @@
 - (void)layoutSubviews {
     [super layoutSubviews];
 
+    CGFloat boundsWidth = CGRectGetWidth(self.bounds);
+    CGFloat boundsHeight = CGRectGetHeight(self.bounds);
+    CGFloat safeAreaHeight = 0;
+
+    if (@available(iOS 11.0, *)) {
+        safeAreaHeight = self.safeAreaInsets.bottom;
+    }
+
+    boundsHeight -= safeAreaHeight;
+
     int rows = 4;
     int sections = 3;
 
     const UIUserInterfaceIdiom interfaceIdiom = UI_USER_INTERFACE_IDIOM();
-    const CGFloat maximumWidth = (interfaceIdiom == UIUserInterfaceIdiomPad) ? 400.0 : CGRectGetWidth(self.bounds);
-
+    const CGFloat maximumWidth = (interfaceIdiom == UIUserInterfaceIdiomPad) ? 400.0 : boundsWidth;
+    
     CGFloat sep = [self.styleClass separator];
-    CGFloat left = (CGRectGetWidth(self.bounds) - maximumWidth) / 2;
+    CGFloat left = (boundsWidth - maximumWidth) / 2;
     CGFloat top = 0.f;
-
-  CGRect bounds = self.bounds;
-  CGFloat boundsHeight = CGRectGetHeight(bounds);
-  if (@available(iOS 11.0, *)) {
-    boundsHeight -= self.window.safeAreaInsets.bottom;
-  }
-#if defined(__LP64__) && __LP64__
+    
     CGFloat buttonHeight = trunc((boundsHeight - sep * (rows - 1)) / rows) + sep;
-#else
-    CGFloat buttonHeight = truncf((boundsHeight - sep * (rows - 1)) / rows) + sep;
-#endif
 
-    CGSize buttonSize = CGSizeMake((CGRectGetWidth(bounds) - sep * (sections - 1)) / sections, buttonHeight);
+    CGSize buttonSize = CGSizeMake((boundsWidth - sep * (sections - 1)) / sections, buttonHeight);
     if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
         buttonSize = CGSizeMake((maximumWidth - sep * (sections - 1)) / sections, buttonHeight);
     }
@@ -150,7 +159,7 @@
         numberButton.frame = CGRectMake(left, top, buttonSize.width, buttonSize.height);
 
         if (i % sections == 0) {
-            left = (CGRectGetWidth(bounds) - maximumWidth) / 2;
+            left = (boundsWidth - maximumWidth) / 2;
             top += buttonSize.height + sep;
         }
         else {
@@ -160,7 +169,7 @@
 
     // Function button
     //
-    left = (CGRectGetWidth(bounds) - maximumWidth) / 2;
+    left = (boundsWidth - maximumWidth) / 2;
     self.leftButton.frame = CGRectMake(left, top, buttonSize.width, buttonSize.height);
 
     // Number buttons (0)
@@ -173,6 +182,9 @@
     //
     left += buttonSize.width + sep;
     self.clearButton.frame = CGRectMake(left, top, buttonSize.width, buttonSize.height);
+
+    // Safe area cover
+    self.safeAreaCover.frame = CGRectMake(0, top + buttonSize.height + sep, boundsWidth, safeAreaHeight);
 }
 
 #pragma mark - Notifications
@@ -200,12 +212,23 @@
 }
 
 - (void)textDidBeginEditing:(NSNotification *)notification {
-    if (![notification.object conformsToProtocol:@protocol(UITextInput)]) {
+    if (![notification.object conformsToProtocol:@protocol(UIKeyInput)]) {
         return;
     }
 
-    UIResponder<UITextInput> *textInput = notification.object;
+    UIResponder<UIKeyInput> *textInput = notification.object;
+    [self didBecomeActiveInputViewForResponder:textInput];
+}
 
+- (void)textDidEndEditing:(NSNotification *)notification {
+    [self didResignInputViewForResponder];
+}
+
+- (void)didResignInputViewForResponder {
+    self.textInput = nil;
+}
+
+- (void)didBecomeActiveInputViewForResponder:(UIResponder<UIKeyInput> *)textInput {
     if (textInput.inputView && self == textInput.inputView) {
         self.textInput = textInput;
 
@@ -229,10 +252,6 @@
             }
         }
     }
-}
-
-- (void)textDidEndEditing:(NSNotification *)notification {
-    self.textInput = nil;
 }
 
 #pragma mark - UIResponder
@@ -355,20 +374,21 @@
     NSString *text = sender.currentTitle;
 
     if (_delegateFlags.textInputSupportsShouldChangeTextInRange) {
-        if ([self.textInput shouldChangeTextInRange:self.textInput.selectedTextRange replacementText:text]) {
+        UIResponder<UITextInput> *input = (UIResponder<UITextInput> *)self.textInput;
+        if ([input shouldChangeTextInRange:input.selectedTextRange replacementText:text]) {
             [self.textInput insertText:text];
         }
     }
     else if (_delegateFlags.delegateSupportsTextFieldShouldChangeCharactersInRange) {
-        NSRange selectedRange = [[self class] selectedRange:self.textInput];
         UITextField *textField = (UITextField *)self.textInput;
+        NSRange selectedRange = [[self class] selectedRange:textField];
         if ([textField.delegate textField:textField shouldChangeCharactersInRange:selectedRange replacementString:text]) {
             [self.textInput insertText:text];
         }
     }
     else if (_delegateFlags.delegateSupportsTextViewShouldChangeTextInRange) {
-        NSRange selectedRange = [[self class] selectedRange:self.textInput];
         UITextView *textView = (UITextView *)self.textInput;
+        NSRange selectedRange = [[self class] selectedRange:textView];
         if ([textView.delegate textView:textView shouldChangeTextInRange:selectedRange replacementText:text]) {
             [self.textInput insertText:text];
         }
@@ -384,33 +404,38 @@
     }
 
     if (_delegateFlags.textInputSupportsShouldChangeTextInRange) {
-        UITextRange *textRange = self.textInput.selectedTextRange;
+        UIResponder<UITextInput> *input = (UIResponder<UITextInput> *)self.textInput;
+        UITextRange *textRange = input.selectedTextRange;
         if ([textRange.start isEqual:textRange.end]) {
-            UITextPosition *newStart = [self.textInput positionFromPosition:textRange.start inDirection:UITextLayoutDirectionLeft offset:1];
-            textRange = [self.textInput textRangeFromPosition:newStart toPosition:textRange.end];
+            UITextPosition *newStart = [input positionFromPosition:textRange.start inDirection:UITextLayoutDirectionLeft offset:1];
+            textRange = [input textRangeFromPosition:newStart toPosition:textRange.end];
         }
-        if ([self.textInput shouldChangeTextInRange:textRange replacementText:@""]) {
-            [self.textInput deleteBackward];
+        if ([input shouldChangeTextInRange:textRange replacementText:@""]) {
+            [input deleteBackward];
         }
     }
     else if (_delegateFlags.delegateSupportsTextFieldShouldChangeCharactersInRange) {
-        NSRange selectedRange = [[self class] selectedRange:self.textInput];
+        UITextField *textField = (UITextField *)self.textInput;
+
+        NSRange selectedRange = [[self class] selectedRange:textField];
         if (selectedRange.length == 0 && selectedRange.location > 0) {
             selectedRange.location--;
             selectedRange.length = 1;
         }
-        UITextField *textField = (UITextField *)self.textInput;
+
         if ([textField.delegate textField:textField shouldChangeCharactersInRange:selectedRange replacementString:@""]) {
             [self.textInput deleteBackward];
         }
     }
     else if (_delegateFlags.delegateSupportsTextViewShouldChangeTextInRange) {
-        NSRange selectedRange = [[self class] selectedRange:self.textInput];
+        UITextView *textView = (UITextView *)self.textInput;
+
+        NSRange selectedRange = [[self class] selectedRange:textView];
         if (selectedRange.length == 0 && selectedRange.location > 0) {
             selectedRange.location--;
             selectedRange.length = 1;
         }
-        UITextView *textView = (UITextView *)self.textInput;
+
         if ([textView.delegate textView:textView shouldChangeTextInRange:selectedRange replacementText:@""]) {
             [self.textInput deleteBackward];
         }

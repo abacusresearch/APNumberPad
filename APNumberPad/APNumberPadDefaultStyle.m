@@ -7,7 +7,7 @@
 //
 
 #import "APNumberPadDefaultStyle.h"
-#import "NSBundle+APNumberPad.h"
+#import "Private/NSBundle+APNumberPad.h"
 
 static inline UIColor *APNP_RGBa(int r, int g, int b, CGFloat alpha) {
     return [UIColor colorWithRed:r / 255.0
@@ -32,10 +32,18 @@ static inline UIColor *APNP_RGBa(int r, int g, int b, CGFloat alpha) {
     return APNP_RGBa(183, 186, 191, 1.0);
 }
 
++ (UIColor *)safeAreaSpaceColor {
+    return [UIColor clearColor];
+}
+
 #pragma mark - Number button
 
 + (UIFont *)numberButtonFont {
-    return [UIFont systemFontOfSize:28.0 weight:UIFontWeightLight];
+    if (@available(iOS 8.2, *)) {
+        return [UIFont systemFontOfSize:28.0 weight:UIFontWeightLight];
+    } else {
+        return [UIFont systemFontOfSize:28.0];
+    }
 }
 
 + (UIColor *)numberButtonTextColor {
@@ -53,7 +61,11 @@ static inline UIColor *APNP_RGBa(int r, int g, int b, CGFloat alpha) {
 #pragma mark - Function button
 
 + (UIFont *)functionButtonFont {
-    return [UIFont systemFontOfSize:28.0 weight:UIFontWeightLight];
+    if (@available(iOS 8.2, *)) {
+        return [UIFont systemFontOfSize:28.0 weight:UIFontWeightLight];
+    } else {
+        return [UIFont systemFontOfSize:28.0];
+    }
 }
 
 + (UIColor *)functionButtonTextColor {

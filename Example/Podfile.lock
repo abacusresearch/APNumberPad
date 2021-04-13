@@ -1,0 +1,16 @@
+PODS:
+  - APNumberPad (1.3.1)
+
+DEPENDENCIES:
+  - APNumberPad (from `../`)
+
+EXTERNAL SOURCES:
+  APNumberPad:
+    :path: "../"
+
+SPEC CHECKSUMS:
+  APNumberPad: 8d5f8b10d71238a4b694dad42ac80e2a1c41ae58
+
+PODFILE CHECKSUM: 3d2d90e7be4d6fbab04887503f014041162260c6
+
+COCOAPODS: 1.9.3
